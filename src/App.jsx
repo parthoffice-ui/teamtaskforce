@@ -4,10 +4,6 @@ import { AuthProvider }  from './context/AuthContext.jsx';
 import { AppProvider }   from './context/AppContext.jsx';
 import AppRouter         from './router/AppRouter.jsx';
 
-/**
- * Root application component.
- * Wraps everything in providers (order matters — outer to inner).
- */
 export default function App() {
   return (
     <BrowserRouter>

@@ -4,7 +4,6 @@ import {
   onSnapshot, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase/config.js';
-import { SEED_USERS, SEED_TASKS, SEED_LEAVES, SEED_ATTENDANCE, SEED_NOTIFS } from '../data/seedData.js';
 import { uid, nowFull } from '../utils/dateUtils.js';
 
 const AppContext = createContext(null);
@@ -12,33 +11,19 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [state, setState] = useState({
     users: [], tasks: [], leaves: [], attendance: [], notifs: [],
-    loading: true,
+    loading: false,
   });
+  const [companyId, setCompanyId] = useState(null);
 
+  // ── Load company data when companyId changes ──────────────────
   useEffect(() => {
-    const seedIfEmpty = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'users'));
-        if (!snap.empty) return;
-        await Promise.all([
-          ...SEED_USERS.map((d)      => setDoc(doc(db, 'users',      d.id), d)),
-          ...SEED_TASKS.map((d)      => setDoc(doc(db, 'tasks',      d.id), d)),
-          ...SEED_LEAVES.map((d)     => setDoc(doc(db, 'leaves',     d.id), d)),
-          ...SEED_ATTENDANCE.map((d) => setDoc(doc(db, 'attendance', d.id), d)),
-          ...SEED_NOTIFS.map((d)     => setDoc(doc(db, 'notifs',     d.id), d)),
-        ]);
-      } catch (e) {
-        console.error('Seed error:', e);
-      }
-    };
-    seedIfEmpty();
-  }, []);
+    if (!companyId) return;
 
-  useEffect(() => {
     const COLS = ['users', 'tasks', 'leaves', 'attendance', 'notifs'];
     let loaded = 0;
+
     const unsubs = COLS.map((col) =>
-      onSnapshot(collection(db, col), (snap) => {
+      onSnapshot(collection(db, 'companies', companyId, col), (snap) => {
         const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
         loaded++;
         setState((prev) => ({
@@ -48,55 +33,69 @@ export function AppProvider({ children }) {
         }));
       })
     );
+
     return () => unsubs.forEach((u) => u());
+  }, [companyId]);
+
+  // ── Called from AuthContext after login ───────────────────────
+  const initCompany = useCallback((cId) => {
+    setCompanyId(cId);
+    setState((p) => ({ ...p, loading: true }));
   }, []);
 
+  // ── Dispatch → writes to company subcollection ────────────────
   const dispatch = useCallback(async (action) => {
+    if (!companyId) return;
     const { type, payload } = action;
+    const base = (col) => doc(db, 'companies', companyId, col, payload?.id || payload);
+
     try {
       switch (type) {
         case 'ADD_TASK':
         case 'UPDATE_TASK':
-          await setDoc(doc(db, 'tasks', payload.id), payload);
+          await setDoc(doc(db, 'companies', companyId, 'tasks', payload.id), payload);
           break;
         case 'DELETE_TASK':
-          await deleteDoc(doc(db, 'tasks', payload));
+          await deleteDoc(doc(db, 'companies', companyId, 'tasks', payload));
           break;
         case 'ADD_LEAVE':
         case 'UPDATE_LEAVE':
-          await setDoc(doc(db, 'leaves', payload.id), payload);
+          await setDoc(doc(db, 'companies', companyId, 'leaves', payload.id), payload);
           break;
         case 'ADD_ATTENDANCE':
         case 'UPDATE_ATTENDANCE':
-          await setDoc(doc(db, 'attendance', payload.id), payload);
+          await setDoc(doc(db, 'companies', companyId, 'attendance', payload.id), payload);
           break;
         case 'ADD_NOTIF':
-          await setDoc(doc(db, 'notifs', payload.id), payload);
+          await setDoc(doc(db, 'companies', companyId, 'notifs', payload.id), payload);
           break;
         case 'READ_NOTIF':
-          await setDoc(doc(db, 'notifs', payload), { read: true }, { merge: true });
+          await setDoc(doc(db, 'companies', companyId, 'notifs', payload), { read: true }, { merge: true });
           break;
         case 'READ_ALL_NOTIFS': {
           const mine = state.notifs.filter((n) => n.forId === payload && !n.read);
-          await Promise.all(mine.map((n) => setDoc(doc(db, 'notifs', n.id), { read: true }, { merge: true })));
+          await Promise.all(mine.map((n) =>
+            setDoc(doc(db, 'companies', companyId, 'notifs', n.id), { read: true }, { merge: true })
+          ));
           break;
         }
         case 'ADD_USER':
-          await setDoc(doc(db, 'users', payload.id), payload);
+          await setDoc(doc(db, 'companies', companyId, 'users', payload.id), payload);
           break;
       }
     } catch (e) {
       console.error('Dispatch error:', type, e);
     }
-  }, [state.notifs]);
+  }, [companyId, state.notifs]);
 
   const addNotif = useCallback(async (text, forId) => {
+    if (!companyId) return;
     const notif = { id: uid(), text, forId, read: false, at: nowFull() };
-    await setDoc(doc(db, 'notifs', notif.id), notif);
-  }, []);
+    await setDoc(doc(db, 'companies', companyId, 'notifs', notif.id), notif);
+  }, [companyId]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, addNotif }}>
+    <AppContext.Provider value={{ state, dispatch, addNotif, initCompany, companyId }}>
       {children}
     </AppContext.Provider>
   );

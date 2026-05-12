@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Button from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const navigate  = useNavigate();
+  const { login, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +20,16 @@ export default function LoginPage() {
     const ok = await login(email, password);
     setLoading(false);
     if (ok) navigate('/');
-    else    setError('Invalid email or password');
+    else setError('Invalid email or password');
+  };
+
+  const handleGoogle = async () => {
+    setError('');
+    setLoading(true);
+    const ok = await loginWithGoogle();
+    setLoading(false);
+    if (ok) navigate('/');
+    else setError('Google login failed — try again');
   };
 
   return (
@@ -34,6 +43,44 @@ export default function LoginPage() {
 
         <div className="login-card">
           <h2 className="login-title">Sign In</h2>
+
+          {/* Google Login */}
+          <button
+            onClick={handleGoogle}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '10px',
+              marginBottom: '16px',
+              background: '#fff',
+              border: '1.5px solid var(--border)',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              color: '#333',
+            }}
+          >
+            <img 
+              src="https://www.google.com/favicon.ico" 
+              width="18" height="18" 
+              alt="Google" 
+            />
+            Continue with Google
+          </button>
+
+          <div style={{ 
+            textAlign: 'center', 
+            color: 'var(--muted)', 
+            fontSize: '12px',
+            marginBottom: '16px',
+          }}>
+            — or sign in with email —
+          </div>
 
           <Input
             label="Email"
@@ -61,6 +108,21 @@ export default function LoginPage() {
           >
             {loading ? 'Signing in...' : 'Sign In →'}
           </Button>
+
+          <div style={{ 
+            textAlign: 'center', 
+            marginTop: '16px',
+            color: 'var(--muted)',
+            fontSize: '13px',
+          }}>
+            Company nahi hai?{' '}
+            <Link 
+              to="/register" 
+              style={{ color: 'var(--primary)', fontWeight: '700' }}
+            >
+              Register karo →
+            </Link>
+          </div>
         </div>
       </div>
     </div>
