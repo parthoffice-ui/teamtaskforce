@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useAppContext } from '../context/AppContext.jsx';
 import Button from '../components/ui/Button.jsx';
 import { Input } from '../components/ui/Input.jsx';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const { state } = useAppContext();
   const navigate  = useNavigate();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (!email || !password) { setError('Email aur password daalo'); return; }
     setError('');
-    const ok = login(state.users, email, password);
+    setLoading(true);
+    const ok = await login(email, password);
+    setLoading(false);
     if (ok) navigate('/');
     else    setError('Invalid email or password');
   };
@@ -52,8 +54,12 @@ export default function LoginPage() {
 
           {error && <p className="login-error">{error}</p>}
 
-          <Button style={{ width: '100%', fontSize: 15, padding: 11 }} onClick={handleLogin}>
-            Sign In →
+          <Button
+            style={{ width: '100%', fontSize: 15, padding: 11 }}
+            onClick={handleLogin}
+            disabled={loading}
+          >
+            {loading ? 'Signing in...' : 'Sign In →'}
           </Button>
         </div>
       </div>

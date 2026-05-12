@@ -1,29 +1,41 @@
 import { createContext, useContext, useState } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
 
-  /**
-   * Log in: find user by email+password in the users array
-   * Returns true on success, false on failure
-   */
-  const login = (users, email, password) => {
-    const found = users.find((u) => u.email === email && u.password === password);
-    if (found) {
-      setCurrentUser(found);
-      return true;
+  const login = async (email, password) => {
+    setAuthLoading(true);
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('email',    '==', email),
+        where('password', '==', password)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setCurrentUser({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        setAuthLoading(false);
+        return true;
+      }
+      setAuthLoading(false);
+      return false;
+    } catch (err) {
+      console.error('Login error:', err);
+      setAuthLoading(false);
+      return false;
     }
-    return false;
   };
 
   const logout = () => setCurrentUser(null);
-
   const isAdmin = currentUser?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ currentUser, login, logout, isAdmin, authLoading }}>
       {children}
     </AuthContext.Provider>
   );
